@@ -12,6 +12,7 @@ import pandas as pd
 import math
 import matplotlib.pyplot as plt
 import os
+import sys
 from scipy.signal import convolve2d
 from scipy.ndimage import gaussian_filter
 
@@ -640,6 +641,14 @@ def create_legend(height, width, ranges):
     
     return legend
 
+# var needed for own implementation of state machine.
+state = 1
+# 1 : check surface
+# 2 : decide cutoff value
+# 3 : get object density (calibrate)
+# 4 : start recording/measurement : save in list and np.array
+# 5 : stop recording/measurement : export to csv. Ask to start over.
+
 # Continuous loop
 while True:
     frame = pipe.wait_for_frames()
@@ -665,8 +674,16 @@ while True:
 
     combined_image_height = np.hstack((height_colormap, legend_height))
     cv2.imshow('Height Colormap with Legend', combined_image_height)
-
-    get_flatness(depth_image)
+    
+    if state == 1:
+        get_flatness(depth_image)
+        user_input = input("Do you want to proceed to the next stage? (yes/no): ")
+        if user_input.lower() == 'yes':
+            state = 2  # Change state to move to the next stage
+        elif user_input.lower() == 'no':
+            continue  # Continue in the current stage
+        else:
+            print("Invalid input. Please type 'yes' or 'no'.")
 
     # Check for user input to start the measurements
     key = cv2.waitKey(1)
