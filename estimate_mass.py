@@ -236,7 +236,7 @@ def tarre(depth_image_filtered):
     mean_distance = np.mean(depths_aoi)
     
     if tarrecounter == 1:
-        DEPTH_THRESHOLD_MAX = mean_distance - 6
+        DEPTH_THRESHOLD_MAX = mean_distance - 5
     elif tarrecounter == 2:
         DEPTH_THRESHOLD_MAX = 730
     #average_floordistances.append(mean_distance)
@@ -272,35 +272,6 @@ def get_density(mass,volume):
     density = mass/volume
     return 
 
-def get_errors(depths):
-    
-    depths_aoi = depths[area_of_interest[0][1]:area_of_interest[1][1], area_of_interest[0][0]:area_of_interest[1][0]]
-    
-    horizontal_kernel = np.array([[1], [-1]])
-    vertical_kernel = np.array([[1], [-1]])
-    
-    # Calculate horizontal and vertical differences (errors).
-    dx = abs(convolve2d(depths_aoi, horizontal_kernel, mode='same'))
-    dy = abs(convolve2d(depths_aoi, vertical_kernel, mode='same'))
-    
-    image_height, image_width = depths_aoi.shape
-    
-    # Assuming dx and dy are arrays of differences from earlier calculations
-    normalized_dx = np.sum(dx) / (image_height * (image_width - 1))
-    normalized_dy = np.sum(dy) / ((image_height - 1) * image_width)
-    
-    # Define thresholds based on your empirical calibration
-    threshold = 0.5  # Example threshold, adjust based on calibration
-    is_flat = normalized_dx < threshold and normalized_dy < threshold
-
-    
-    # Print results to examine horizontal and vertical errors.
-    '''
-    print("Horizontal Errors (dx):")
-    print(normalized_dx)
-    print("\nVertical Errors (dy):")
-    print(normalized_dy)
-    '''
 def get_flatness(depths):
     depths_aoi = depths[area_of_interest[0][1]:area_of_interest[1][1], area_of_interest[0][0]:area_of_interest[1][0]]
     
@@ -308,13 +279,17 @@ def get_flatness(depths):
     maximum = np.max(depths_aoi)
     
     flatness = maximum - minimum
-    print("Flatness inside area of interest: {:.2f}mm".format(flatness))
+    print("Depth difference inside area of interest: {:.2f}mm".format(flatness))
     
     if flatness < 15:
         value = "flat enough"
     else:
         value = "not flat enough"
     
+    '''
+    average = np.mean(depths_aoi)
+    print(f"Average : {average}")
+    '''
     print(f"Flatness : {value}")
     
     return flatness
@@ -649,6 +624,29 @@ state = 1
 # 4 : start recording/measurement : save in list and np.array
 # 5 : stop recording/measurement : export to csv. Ask to start over.
 
+printed = False
+
+def state_machine(key):
+    global state, printed
+    
+    if state == 1:
+        if printed == False:
+            print("press A to get surface flatness.\n")
+            printed = True
+        if key == ord('a'):
+            get_flatness(depth_image)
+            print("Continue : press Z")
+            print("Try again : press A")
+        if key == ord('z'):
+            state = 2
+            printed = False
+    elif state == 2:
+        if printed == False:
+            print("state 2")
+            printed = True
+            
+
+
 # Continuous loop
 while True:
     frame = pipe.wait_for_frames()
@@ -675,23 +673,17 @@ while True:
     combined_image_height = np.hstack((height_colormap, legend_height))
     cv2.imshow('Height Colormap with Legend', combined_image_height)
     
-    if state == 1:
-        get_flatness(depth_image)
-        user_input = input("Do you want to proceed to the next stage? (yes/no): ")
-        if user_input.lower() == 'yes':
-            state = 2  # Change state to move to the next stage
-        elif user_input.lower() == 'no':
-            continue  # Continue in the current stage
-        else:
-            print("Invalid input. Please type 'yes' or 'no'.")
-
     # Check for user input to start the measurements
     key = cv2.waitKey(1)
     
-    if key == ord('t'):
+    
+    if key == ord('a'):
+        get_flatness(depth_image)
+    elif key == ord('t'):
         DEPTH_THRESHOLD_MAX = min(DEPTH_THRESHOLD_MAX + VARIATION, 1000.0)  # Ensure max_depth does not go above 1m
     elif key == ord('g'):
         DEPTH_THRESHOLD_MAX = max(DEPTH_THRESHOLD_MIN, DEPTH_THRESHOLD_MAX - VARIATION)  # Ensure max_depth does not go below min_depth
+    
     
     elif key == ord('o'): #start tarre
         tarre(depth_image)
