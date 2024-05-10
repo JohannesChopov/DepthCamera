@@ -43,7 +43,8 @@ DEPTH_THRESHOLD_MIN = 0  # mm
 DEPTH_THRESHOLD_MAX = 730 # mm
 #DEPTH_THRESHOLD_MAX = 533 # mm
 
-DEPTHRANGE = [650 , 750]
+DEPTHRANGE = [720 , 740]
+#DEPTHRANGE = [650 , 750]
 #DEPTHRANGE = [450 , 550]
 
 HEIGHTRANGE = [0, 200]
@@ -154,7 +155,7 @@ def apply_filters(depth_frame):
     #depth_frame = dec_filter.process(depth_frame)
     #depth_frame = spat_filter.process(depth_frame)
     #depth_frame = temp_filter.process(depth_frame)
-    #depth_frame = hole_filter.process(depth_frame)
+    depth_frame = hole_filter.process(depth_frame)
     
     return depth_frame
 
@@ -229,9 +230,9 @@ mean_background = None
 def tarre(depth_image_filtered):
     global mean_distance, integral1, volume1, background_measurements, DEPTH_THRESHOLD_MAX
     
-    depth_aoi = depth_image_filtered[area_of_interest[0][1]:area_of_interest[1][1], area_of_interest[0][0]:area_of_interest[1][0]]
+    depths_aoi = depth_image_filtered[area_of_interest[0][1]:area_of_interest[1][1], area_of_interest[0][0]:area_of_interest[1][0]]
     
-    mean_distance = np.mean(depth_aoi)
+    mean_distance = np.mean(depths_aoi)
     
     if tarrecounter == 1:
         DEPTH_THRESHOLD_MAX = mean_distance - 6
@@ -249,13 +250,13 @@ def tarre(depth_image_filtered):
 def measure(depth_image_filtered):
     global mean_distance, integral2, volume2, object_measurements, mean_background, recordcounter
     
-    depth_aoi = depth_image_filtered[area_of_interest[0][1]:area_of_interest[1][1], area_of_interest[0][0]:area_of_interest[1][0]]
-    height_aoi = DEPTH_THRESHOLD_MAX - depth_aoi
+    depths_aoi = depth_image_filtered[area_of_interest[0][1]:area_of_interest[1][1], area_of_interest[0][0]:area_of_interest[1][0]]
+    heights_aoi = DEPTH_THRESHOLD_MAX - depths_aoi
     
-    height_aoi[height_aoi < 0] = 0 # alle negatieve waarden worden 0
-    height_aoi[height_aoi >= DEPTH_THRESHOLD_MAX] = DEPTH_THRESHOLD_MIN # alle waarden die te groot zijn worden gelimit
+    heights_aoi[heights_aoi < 0] = 0 # alle negatieve waarden worden 0
+    heights_aoi[heights_aoi >= DEPTH_THRESHOLD_MAX] = DEPTH_THRESHOLD_MIN # alle waarden die te groot zijn worden gelimit
 
-    voxels = dynamic_areas(depth_aoi) * height_aoi
+    voxels = dynamic_areas(depths_aoi) * heights_aoi
     object_volume = np.sum(voxels)
     
     #print("Volume object = {:.2f}mm³".format(object_volume)) # * density
@@ -299,6 +300,23 @@ def get_errors(depths):
     print("\nVertical Errors (dy):")
     print(normalized_dy)
     '''
+def get_flatness(depths):
+    depths_aoi = depths[area_of_interest[0][1]:area_of_interest[1][1], area_of_interest[0][0]:area_of_interest[1][0]]
+    
+    minimum = np.min(depths_aoi)
+    maximum = np.max(depths_aoi)
+    
+    flatness = maximum - minimum
+    print("Flatness inside area of interest: {:.2f}mm".format(flatness))
+    
+    if flatness < 15:
+        value = "flat enough"
+    else:
+        value = "not flat enough"
+    
+    print(f"Flatness : {value}")
+    
+    return flatness
 
 def convert_depth(radial_depth, intrinsics):
     focal_length = intrinsics.fx
@@ -648,7 +666,7 @@ while True:
     combined_image_height = np.hstack((height_colormap, legend_height))
     cv2.imshow('Height Colormap with Legend', combined_image_height)
 
-    get_errors(depth_image)
+    get_flatness(depth_image)
 
     # Check for user input to start the measurements
     key = cv2.waitKey(1)
