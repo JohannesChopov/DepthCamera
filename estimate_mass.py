@@ -686,15 +686,18 @@ while True:
     
     
     elif key == ord('o'): #start tarre
-        tarre(depth_image)
         tarrecounter = 1
+        tarre(depth_image)
     elif key == ord('l'): #stop tarre
         tarrecounter = 2
+        tarre(depth_image)
+        
     elif key == ord('p'): #start measuring and append to the list
         start = 1
         framecounter = 0
     elif key == ord('m'): #stop measurements and output into csv file.
         start = 2
+        
     if key == ord('q'):
         break
     
