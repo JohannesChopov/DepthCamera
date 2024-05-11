@@ -16,9 +16,13 @@ import sys
 from scipy.signal import convolve2d
 from scipy.ndimage import gaussian_filter
 
-DIRECTORY = "C:/Users/Johannes/Documents/Johannes/Schoolvakken/3de_bach/BACHELOR/proef/Documentatie/key tech metingen/cutoff/witte_frieten/geen_filter/meting2"
+DIRECTORY = "C:/Users/Johannes/Documents/Johannes/Schoolvakken/3de_bach/BACHELOR/proef/Documentatie/thuis/cutoff/realsensedoos/meting1"
 
-density = 0.0005728 #g/mm³
+# massa voor massa dochtheid calibratie
+mass = 400.0 #g
+
+density = 0
+#density = 0.0005728 #g/mm³
 #density = 0.0002754 #g/mm³
 #density = 0.0004235 #g/mm³
 
@@ -55,6 +59,7 @@ VARIATION = 1 #mm step for changing depth cut-off height
 
 start = 0
 tarrecounter = 0
+calibrate_counter = 0
 framecounter = 0
 # Distance from the camera in meters. Determined by the camera later...
 mean_distance = 0 # meters
@@ -225,7 +230,7 @@ def put_filter(depth_frame):
 # Global variables to store measurements
 background_measurements = []
 object_measurements = []
-average_floordistances = []
+volume_calibration = []
 mean_background = None
 
 def tarre(depth_image_filtered):
@@ -239,7 +244,6 @@ def tarre(depth_image_filtered):
         DEPTH_THRESHOLD_MAX = mean_distance - 5
     elif tarrecounter == 2:
         DEPTH_THRESHOLD_MAX = 730
-    #average_floordistances.append(mean_distance)
     
     '''
     calculate_pixel_area(HFOV, VFOV, SCREEN_WIDTH, SCREEN_HEIGHT, mean_distance)
@@ -268,9 +272,79 @@ def measure(depth_image_filtered):
     
     '''
 
-def get_density(mass,volume):
+def calc_density(mass, depth_image):
+    
+    volume = measure(depth_image)
+    
+    #gebruik een lijst voor average te vinden en dan zo de density van de voeding.
+    volume_calibration.append(volume)
+    
     density = mass/volume
     return 
+
+def get_density(depth_image, mass):
+    global calibrate_counter, volume_calibration, density
+    
+    if calibrate_counter == 1:
+        volume = measure(depth_image)
+        volume_calibration.append(volume)
+    if calibrate_counter == 2:
+        
+        avg_volume = np.mean(volume_calibration)
+        
+        # Plot the results
+        plt.figure(figsize=(10, 6))
+        plt.plot(volume_calibration, label='Raw Volume Measurements', alpha=0.5)
+        #plt.plot(range(window_size - 1, len(smoothed_measurements) + window_size - 1), smoothed_measurements, label='Smoothed Volume Measurements', color='orange')
+        plt.axhline(y=avg_volume, color='r', linestyle='-', label='Average Raw Volume')
+        #plt.axhline(y=average_volume_smoothed, color='green', linestyle='--', label='Average Smoothed Volume')
+        plt.xlabel('Measurement Number')
+        plt.ylabel('Volume in mm³')
+        plt.title('Background Volume Measurements')
+        plt.legend()
+        plt.show()
+        
+        density = mass / avg_volume
+        
+        print(density)
+        
+        volume_calibration = [] #reset
+        calibrate_counter = 0
+
+def tarre_live(depth_image):
+    global background_measurements, tarrecounter, mean_background
+    if tarrecounter == 1:
+        tarre(depth_image)
+    if tarrecounter == 2:
+        # Calculate the average volume of raw data
+        average_volume_raw = np.mean(background_measurements)
+        print(f"Average Raw Background Volume: {average_volume_raw}")
+
+        # Apply the moving average filter to the measurement data
+        window_size = 5  # Example window size; you may choose to change this
+        smoothed_measurements = moving_average(background_measurements, window_size)
+
+        # Calculate the average volume of smoothed data
+        average_volume_smoothed = np.mean(smoothed_measurements)
+        print(f"Average Smoothed Background Volume: {average_volume_smoothed}")
+        
+        mean_background = average_volume_raw
+        
+        
+        # Plot the results
+        plt.figure(figsize=(10, 6))
+        plt.plot(background_measurements, label='Raw Volume Measurements', alpha=0.5)
+        plt.plot(range(window_size - 1, len(smoothed_measurements) + window_size - 1), smoothed_measurements, label='Smoothed Volume Measurements', color='orange')
+        plt.axhline(y=average_volume_raw, color='r', linestyle='-', label='Average Raw Volume')
+        plt.axhline(y=average_volume_smoothed, color='green', linestyle='--', label='Average Smoothed Volume')
+        plt.xlabel('Measurement Number')
+        plt.ylabel('Volume in mm')
+        plt.title('Background Volume Measurements')
+        plt.legend()
+        plt.show()
+        
+        background_measurements = []
+        tarrecounter = 0
 
 def get_flatness(depths):
     depths_aoi = depths[area_of_interest[0][1]:area_of_interest[1][1], area_of_interest[0][0]:area_of_interest[1][0]]
@@ -447,40 +521,7 @@ def perform_tarre():
     plt.legend()
     plt.show()
 
-def tarre_live(depth_image):
-    global background_measurements, tarrecounter, mean_background
-    if tarrecounter == 1:
-        tarre(depth_image)
-    if tarrecounter == 2:
-        # Calculate the average volume of raw data
-        average_volume_raw = np.mean(background_measurements)
-        print(f"Average Raw Background Volume: {average_volume_raw}")
 
-        # Apply the moving average filter to the measurement data
-        window_size = 5  # Example window size; you may choose to change this
-        smoothed_measurements = moving_average(background_measurements, window_size)
-
-        # Calculate the average volume of smoothed data
-        average_volume_smoothed = np.mean(smoothed_measurements)
-        print(f"Average Smoothed Background Volume: {average_volume_smoothed}")
-        
-        mean_background = average_volume_raw
-        
-        
-        # Plot the results
-        plt.figure(figsize=(10, 6))
-        plt.plot(background_measurements, label='Raw Volume Measurements', alpha=0.5)
-        plt.plot(range(window_size - 1, len(smoothed_measurements) + window_size - 1), smoothed_measurements, label='Smoothed Volume Measurements', color='orange')
-        plt.axhline(y=average_volume_raw, color='r', linestyle='-', label='Average Raw Volume')
-        plt.axhline(y=average_volume_smoothed, color='green', linestyle='--', label='Average Smoothed Volume')
-        plt.xlabel('Measurement Number')
-        plt.ylabel('Volume in mm')
-        plt.title('Background Volume Measurements')
-        plt.legend()
-        plt.show()
-        
-        background_measurements = []
-        tarrecounter = 0
         
 def perform_measurements():
     """Perform measurements and calculate the average."""
@@ -616,37 +657,6 @@ def create_legend(height, width, ranges):
     
     return legend
 
-# var needed for own implementation of state machine.
-state = 1
-# 1 : check surface
-# 2 : decide cutoff value
-# 3 : get object density (calibrate)
-# 4 : start recording/measurement : save in list and np.array
-# 5 : stop recording/measurement : export to csv. Ask to start over.
-
-printed = False
-
-def state_machine(key):
-    global state, printed
-    
-    if state == 1:
-        if printed == False:
-            print("press A to get surface flatness.\n")
-            printed = True
-        if key == ord('a'):
-            get_flatness(depth_image)
-            print("Continue : press Z")
-            print("Try again : press A")
-        if key == ord('z'):
-            state = 2
-            printed = False
-    elif state == 2:
-        if printed == False:
-            print("state 2")
-            printed = True
-            
-
-
 # Continuous loop
 while True:
     frame = pipe.wait_for_frames()
@@ -679,19 +689,28 @@ while True:
     
     if key == ord('a'):
         get_flatness(depth_image)
+        
+    # manual cutoff
     elif key == ord('t'):
         DEPTH_THRESHOLD_MAX = min(DEPTH_THRESHOLD_MAX + VARIATION, 1000.0)  # Ensure max_depth does not go above 1m
     elif key == ord('g'):
         DEPTH_THRESHOLD_MAX = max(DEPTH_THRESHOLD_MIN, DEPTH_THRESHOLD_MAX - VARIATION)  # Ensure max_depth does not go below min_depth
     
-    
+    # automatic cutoff
     elif key == ord('o'): #start tarre
         tarrecounter = 1
         tarre(depth_image)
     elif key == ord('l'): #stop tarre
         tarrecounter = 2
         tarre(depth_image)
-        
+    
+    # calibrate/measure density
+    elif key == ord('z'):
+        calibrate_counter = 1
+    elif key == ord('s'):
+        calibrate_counter = 2
+    
+    # start recording
     elif key == ord('p'): #start measuring and append to the list
         start = 1
         framecounter = 0
@@ -701,7 +720,7 @@ while True:
     if key == ord('q'):
         break
     
-    #tarre_live(depth_image)
+    get_density(depth_image, mass)
     outputToCSV(depth_image, color_frame)
 # Stop the pipeline
 pipe.stop()
