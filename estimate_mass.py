@@ -48,7 +48,7 @@ DEPTH_THRESHOLD_MIN = 0  # mm
 DEPTH_THRESHOLD_MAX = 730 # mm
 #DEPTH_THRESHOLD_MAX = 533 # mm
 
-DEPTHRANGE = [720 , 740]
+DEPTHRANGE = [710 , 740]
 #DEPTHRANGE = [650 , 750]
 #DEPTHRANGE = [450 , 550]
 
@@ -150,7 +150,7 @@ def apply_filters(depth_frame):
     Persistence = 3 #1-8
     
     #hole filling filter
-    filling = 2 #0-2
+    filling = 1 #0-2
     
     dec_filter = rs.decimation_filter()
     spat_filter = rs.spatial_filter(Smooth_alpha, Smooth_delta, Filter_mag, Hole_filling)
@@ -233,10 +233,10 @@ object_measurements = []
 volume_calibration = []
 mean_background = None
 
-def tarre(depth_image_filtered):
+def tarre(depth_image):
     global mean_distance, integral1, volume1, background_measurements, DEPTH_THRESHOLD_MAX
     
-    depths_aoi = depth_image_filtered[area_of_interest[0][1]:area_of_interest[1][1], area_of_interest[0][0]:area_of_interest[1][0]]
+    depths_aoi = depth_image[area_of_interest[0][1]:area_of_interest[1][1], area_of_interest[0][0]:area_of_interest[1][0]]
     
     mean_distance = np.mean(depths_aoi)
     
@@ -250,7 +250,17 @@ def tarre(depth_image_filtered):
     '''
     print("MEAN DISTANCE = {:.2f}mm".format(mean_distance))
     
-
+tarre2_execute_flag = False
+    
+def tarre2(depth_image):
+    global tarre2_execute_flag, DEPTH_THRESHOLD_MAX
+    
+    volume = measure(depth_image)
+    
+    if volume > 20000:
+        DEPTH_THRESHOLD_MAX = DEPTH_THRESHOLD_MAX - 1
+    else:
+        tarre2_execute_flag = False
 
 def measure(depth_image_filtered):
     global mean_distance, integral2, volume2, object_measurements, mean_background, recordcounter
@@ -698,11 +708,17 @@ while True:
     
     # automatic cutoff
     elif key == ord('o'): #start tarre
-        tarrecounter = 1
-        tarre(depth_image)
+    
+        tarre2_execute_flag = True
+    
+        #tarrecounter = 1
+        #tarre(depth_image)
     elif key == ord('l'): #stop tarre
-        tarrecounter = 2
-        tarre(depth_image)
+    
+        tarre2_execute_flag = False    
+    
+        #tarrecounter = 2
+        #tarre(depth_image)
     
     # calibrate/measure density
     elif key == ord('z'):
@@ -719,6 +735,9 @@ while True:
         
     if key == ord('q'):
         break
+    
+    if tarre2_execute_flag == True:
+        tarre2(depth_image)
     
     get_density(depth_image, mass)
     outputToCSV(depth_image, color_frame)
