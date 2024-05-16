@@ -16,12 +16,12 @@ import sys
 from scipy.signal import convolve2d
 from scipy.ndimage import gaussian_filter
 
-DIRECTORY = "C:/Users/Johannes/Documents/Johannes/Schoolvakken/3de_bach/BACHELOR/proef/Documentatie/thuis/cutoff/realsensedoos/meting1"
+DIRECTORY = "C:/Users/Johannes/Documents/Johannes/Schoolvakken/3de_bach/BACHELOR/proef/Documentatie/thuis/15mei/gpt1"
 
-# massa voor massa dochtheid calibratie
-mass = 400.0 #g
+# massa voor massa dichtheid calibratie
+mass = 507.5 #g
 
-density = 0
+density = 0.0012104976483512985 #g/mm³
 #density = 0.0005728 #g/mm³
 #density = 0.0002754 #g/mm³
 #density = 0.0004235 #g/mm³
@@ -45,11 +45,11 @@ FOCAL_LENGTHX = 0
 FOCAL_LENGTHY = 0
 
 DEPTH_THRESHOLD_MIN = 0  # mm
-DEPTH_THRESHOLD_MAX = 730 # mm
-#DEPTH_THRESHOLD_MAX = 533 # mm
+DEPTH_THRESHOLD_MAX = 750 # mm
+#DEPTH_THRESHOLD_MAX = 540 # mm
 
-DEPTHRANGE = [710 , 740]
-#DEPTHRANGE = [650 , 750]
+#DEPTHRANGE = [720 , 735]
+DEPTHRANGE = [650 , 750]
 #DEPTHRANGE = [450 , 550]
 
 HEIGHTRANGE = [0, 200]
@@ -103,10 +103,10 @@ def define_area_of_interest(small=True):
         height = 150  # pixels
         width = 80  # pixels
     else:
-        topleft_x = 100  # pixels
+        topleft_x = 110  # pixels
         topleft_y = 50  # pixels
         height = 390  # pixels
-        width = 470  # pixels
+        width = 430  # pixels
 
     return topleft_x, topleft_y, height, width
 
@@ -251,17 +251,18 @@ def tarre(depth_image):
     print("MEAN DISTANCE = {:.2f}mm".format(mean_distance))
     
 tarre2_execute_flag = False
-    
+reset = False
+
 def tarre2(depth_image):
-    global tarre2_execute_flag, DEPTH_THRESHOLD_MAX
+    global tarre2_execute_flag, DEPTH_THRESHOLD_MAX, reset
     
     volume = measure(depth_image)
     
-    if volume > 20000:
+    if volume > 10000:
         DEPTH_THRESHOLD_MAX = DEPTH_THRESHOLD_MAX - 1
     else:
         tarre2_execute_flag = False
-
+        
 def measure(depth_image_filtered):
     global mean_distance, integral2, volume2, object_measurements, mean_background, recordcounter
     
@@ -300,7 +301,7 @@ def get_density(depth_image, mass):
         volume_calibration.append(volume)
     if calibrate_counter == 2:
         
-        avg_volume = np.mean(volume_calibration)
+        avg_volume = np.mean(volume_calibration) #mm³
         
         # Plot the results
         plt.figure(figsize=(10, 6))
@@ -314,7 +315,7 @@ def get_density(depth_image, mass):
         plt.legend()
         plt.show()
         
-        density = mass / avg_volume
+        density = mass / avg_volume # g/mm³
         
         print(density)
         
@@ -365,7 +366,7 @@ def get_flatness(depths):
     flatness = maximum - minimum
     print("Depth difference inside area of interest: {:.2f}mm".format(flatness))
     
-    if flatness < 15:
+    if flatness < 20:
         value = "flat enough"
     else:
         value = "not flat enough"
@@ -408,6 +409,60 @@ def dynamic_areas(depths):
     
     new_areas = dynamic_area(x_mean, z_mean, depths)
     return new_areas
+
+def calculate_pixel_area(depth_frame):
+    global intrinsics
+    fx = intrinsics.fx 
+    fy = intrinsics.fy
+    cx = intrinsics.ppx
+    cy = intrinsics.ppy
+    height, width = depth_frame.shape
+    areas = np.zeros((height, width))
+    
+    for v in range(height - 1):
+        for u in range(width - 1):
+            Z = depth_frame[v, u]
+            Z_right = depth_frame[v, u + 1]
+            Z_bottom = depth_frame[v + 1, u]
+            
+            X = (u - cx) * Z / fx
+            Y = (v - cy) * Z / fy
+            
+            X_right = ((u + 1) - cx) * Z_right / fx
+            Y_bottom = ((v + 1) - cy) * Z_bottom / fy
+            
+            deltaX = abs(X_right - X)
+            deltaY = abs(Y_bottom - Y)
+            
+            areas[v, u] = deltaX * deltaY
+            
+    return areas
+
+def calculate_pixel_area_fov(depth_frame):
+    height, width = depth_frame.shape
+    
+    fov_x = HFOV_RAD
+    fov_y = VFOV_RAD
+    
+    # Calculate the angular resolution per pixel
+    pixel_angle_x = fov_x / width
+    pixel_angle_y = fov_y / height
+    
+    # Initialize the area array
+    areas = np.zeros((height, width))
+    
+    for v in range(height):
+        for u in range(width):
+            Z = depth_frame[v, u]
+            
+            # Calculate delta X and delta Y
+            deltaX = 2 * Z * np.tan(pixel_angle_x / 2)
+            deltaY = 2 * Z * np.tan(pixel_angle_y / 2)
+            
+            # Calculate the area for the pixel
+            areas[v, u] = deltaX * deltaY
+            
+    return areas
 
 def calculatePixelAreas(depths):
     #depth in mm
@@ -530,8 +585,6 @@ def perform_tarre():
     plt.title('Background Volume Measurements')
     plt.legend()
     plt.show()
-
-
         
 def perform_measurements():
     """Perform measurements and calculate the average."""
@@ -708,17 +761,15 @@ while True:
     
     # automatic cutoff
     elif key == ord('o'): #start tarre
-    
+        
         tarre2_execute_flag = True
     
         #tarrecounter = 1
         #tarre(depth_image)
-    elif key == ord('l'): #stop tarre
+    elif key == ord('l'): #reset tarre
     
-        tarre2_execute_flag = False    
-    
-        #tarrecounter = 2
-        #tarre(depth_image)
+        DEPTH_THRESHOLD_MAX = DEPTHRANGE[1]
+        tarre2_execute_flag = False
     
     # calibrate/measure density
     elif key == ord('z'):
