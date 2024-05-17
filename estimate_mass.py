@@ -283,12 +283,21 @@ def plot3Dreal(depth_image):
     ax.set_zlabel('Height (mm)')
     ax.set_title('3D Plot of Height Data')
 
-    # Set the z-axis limit
-    ax.set_zlim(0, 100)
+    # Calculate ranges for each axis
+    x_range = x_coords.max() - x_coords.min()
+    y_range = y_coords.max() - y_coords.min()
+    z_range = heightmax - 0
 
-    # Set equal aspect ratio for all axes
-    #ax.set_box_aspect([np.ptp(x_coords), np.ptp(y_coords), z_max])  # Aspect ratio is [x, y, z]
+    # Calculate the maximum range
+    max_range = max(x_range, y_range, z_range)
 
+    # Set the limits for each axis based on the data
+    ax.set_xlim([x_coords.min(), x_coords.max()])
+    ax.set_ylim([y_coords.min(), y_coords.max()])
+    ax.set_zlim([0, heightmax])
+
+    # Adjust the aspect ratio
+    ax.set_box_aspect([x_range, y_range, z_range])  # Aspect ratio is [x, y, z]
 
     # Show the plot
     plt.show()
