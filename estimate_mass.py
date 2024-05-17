@@ -15,6 +15,7 @@ import os
 import sys
 from scipy.signal import convolve2d
 from scipy.ndimage import gaussian_filter
+from mpl_toolkits.mplot3d import Axes3D
 
 DIRECTORY = "C:/Users/Johannes/Documents/Johannes/Schoolvakken/3de_bach/BACHELOR/proef/Documentatie/thuis/15mei/gpt1"
 
@@ -52,7 +53,7 @@ DEPTH_THRESHOLD_MAX = 750 # mm
 DEPTHRANGE = [650 , 750]
 #DEPTHRANGE = [450 , 550]
 
-HEIGHTRANGE = [0, 200]
+HEIGHTRANGE = [0, 100]
 VARIATION = 1 #mm step for changing depth cut-off height
 
 ###############################################################
@@ -110,7 +111,7 @@ def define_area_of_interest(small=True):
 
     return topleft_x, topleft_y, height, width
 
-RECT_TOPLEFTX, RECT_TOPLEFTY, RECT_HEIGHT, RECT_WIDTH = define_area_of_interest(False)
+RECT_TOPLEFTX, RECT_TOPLEFTY, RECT_HEIGHT, RECT_WIDTH = define_area_of_interest(True)
 area_of_interest = [(RECT_TOPLEFTX, RECT_TOPLEFTY), (RECT_TOPLEFTX + RECT_WIDTH, RECT_TOPLEFTY + RECT_HEIGHT)]
 
 integral1 = 0.0
@@ -187,7 +188,7 @@ def visualize_height(depth_image):
     height_image = DEPTH_THRESHOLD_MAX - (depth_image)
     
     height_image[height_image < 0] = 0 # alle negatieve waarden worden 0
-    height_image[height_image >= DEPTH_THRESHOLD_MAX] = DEPTH_THRESHOLD_MIN # alle waarden die te groot zijn worden gelimit
+    height_image[height_image >= DEPTH_THRESHOLD_MAX] = 0 # alle waarden die te groot zijn worden gelimit
 
     #clipping
     height_image_scaled = (height_image - HEIGHTRANGE[0]) * (255 / (HEIGHTRANGE[1]-HEIGHTRANGE[0]))
@@ -216,6 +217,82 @@ def visualize_height(depth_image):
     #print("Height: {:.3f}m".format(height_cursor))
     
     return height_colormap    
+
+def plot3Dpixels(depth_image):
+    
+    depths_aoi = depth_image[area_of_interest[0][1]:area_of_interest[1][1], area_of_interest[0][0]:area_of_interest[1][0]]
+    heights_aoi = DEPTH_THRESHOLD_MAX - depths_aoi
+    
+    heights_aoi[heights_aoi < 0] = 0 # alle negatieve waarden worden 0
+    heights_aoi[heights_aoi >= DEPTH_THRESHOLD_MAX] = DEPTH_THRESHOLD_MIN # alle waarden die te groot zijn worden gelimit
+    
+    # Generate the x and y coordinates
+    height, width = heights_aoi.shape
+    x = np.linspace(0, width - 1, width)
+    y = np.linspace(0, height - 1, height)
+    x, y = np.meshgrid(x, y)
+
+    # Create a 3D plot
+    fig = plt.figure(figsize=(10, 7))
+    ax = fig.add_subplot(111, projection='3d')
+
+    # Plot the surface
+    ax.plot_surface(x, y, heights_aoi, cmap='viridis')
+
+    # Add labels and title
+    ax.set_xlabel('X axis (pixels)')
+    ax.set_ylabel('Y axis (pixels)')
+    ax.set_zlabel('Height (mm)')
+    ax.set_title('3D Plot of Height Data')
+
+    # Show the plot
+    plt.show()
+    
+def plot3Dreal(depth_image):
+    depths_aoi = depth_image[area_of_interest[0][1]:area_of_interest[1][1], area_of_interest[0][0]:area_of_interest[1][0]]
+    heights_aoi = DEPTH_THRESHOLD_MAX - depths_aoi
+    
+    heights_aoi[heights_aoi < 0] = 0 # alle negatieve waarden worden 0
+    heights_aoi[heights_aoi >= DEPTH_THRESHOLD_MAX] = DEPTH_THRESHOLD_MIN # alle waarden die te groot zijn worden gelimit
+    
+    heightmax = np.max(heights_aoi)
+    z_mean = np.mean(depths_aoi)
+    z_max = np.max(depths_aoi)
+    
+    # Generate the x and y coordinates
+    height, width = heights_aoi.shape
+    
+    x_mean = (2 * np.tan(HFOV_RAD / 2) * z_mean) / SCREEN_WIDTH  # mm/pixel
+    x_coords = np.linspace(0, width - 1, width) * x_mean
+    
+    y_mean = (2 * np.tan(VFOV_RAD / 2) * z_mean) / SCREEN_HEIGHT  # mm/pixel
+    y_coords = np.linspace(0, height - 1, height) * y_mean  # assuming square pixels
+
+    x_coords, y_coords = np.meshgrid(x_coords, y_coords)
+
+    # Create a 3D plot
+    fig = plt.figure(figsize=(10, 7))
+    ax = fig.add_subplot(111, projection='3d')
+
+    # Plot the surface
+    ax.plot_surface(x_coords, y_coords, heights_aoi, cmap='viridis')
+
+    # Add labels and title
+    ax.set_xlabel('X axis (mm)')
+    ax.set_ylabel('Y axis (mm)')
+    ax.set_zlabel('Height (mm)')
+    ax.set_title('3D Plot of Height Data')
+
+    # Set the z-axis limit
+    ax.set_zlim(0, 100)
+
+    # Set equal aspect ratio for all axes
+    #ax.set_box_aspect([np.ptp(x_coords), np.ptp(y_coords), z_max])  # Aspect ratio is [x, y, z]
+
+
+    # Show the plot
+    plt.show()
+
 
 def put_filter(depth_frame):
     # filtering
@@ -258,7 +335,7 @@ def tarre2(depth_image):
     
     volume = measure(depth_image)
     
-    if volume > 10000:
+    if volume > 20000:
         DEPTH_THRESHOLD_MAX = DEPTH_THRESHOLD_MAX - 1
     else:
         tarre2_execute_flag = False
@@ -783,6 +860,10 @@ while True:
         framecounter = 0
     elif key == ord('m'): #stop measurements and output into csv file.
         start = 2
+        
+    if key == ord('v'):
+        plot3Dpixels(depth_image)
+        plot3Dreal(depth_image)
         
     if key == ord('q'):
         break
