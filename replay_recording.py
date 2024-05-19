@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import os 
 import re
 
-DIRECTORY = "C:/Users/Johannes/Documents/Johannes/Schoolvakken/3de_bach/BACHELOR/proef/Documentatie/thuis/cutoff/realsensedoos/meting1"
+DIRECTORY = "C:/Users/Johannes/Documents/Johannes/Schoolvakken/3de_bach/BACHELOR/proef/Documentatie/key tech metingen/14mei/witte_frieten/1500g"
 
 def load_frame(file_path):
     # Load the frame from a .npy file
@@ -59,12 +59,15 @@ def replay_frames(save_directory=DIRECTORY):
             visualize_frame(depth_frame, 'Depth Frame')
             visualize_frame(height_frame, 'Height Frame')
             visualize_frame(color_frame, 'Color Frame')
-
+            
             # Check for user input to break the loop or continue
-            if cv2.waitKey(50) & 0xFF == ord('q'):  # If 'q' is pressed, exit the loop
-                cv2.destroyAllWindows()
-                return  # Stop the function and close windows
-
+            while True:
+                key = cv2.waitKey(0) & 0xFF 
+                if key == ord('q'):  # If 'q' is pressed, exit the loop
+                    cv2.destroyAllWindows()
+                    return  # Stop the function and close windows
+                elif key == ord('p'):  # If 'p' is pressed, break the inner loop and continue
+                    break
 def visualize_frame(frame, window_name):
     # Display the depth frame
     cv2.imshow(window_name, frame)

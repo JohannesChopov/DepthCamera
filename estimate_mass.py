@@ -247,7 +247,7 @@ def plot3Dpixels(depth_image):
 
     # Show the plot
     plt.show()
-    
+
 def plot3Dreal(depth_image):
     depths_aoi = depth_image[area_of_interest[0][1]:area_of_interest[1][1], area_of_interest[0][0]:area_of_interest[1][0]]
     heights_aoi = DEPTH_THRESHOLD_MAX - depths_aoi
@@ -277,6 +277,9 @@ def plot3Dreal(depth_image):
     # Plot the surface
     ax.plot_surface(x_coords, y_coords, heights_aoi, cmap='viridis')
 
+    # Plot the points using scatter
+    #sc = ax.scatter(x_coords, y_coords, heights_aoi, c=heights_aoi, cmap='viridis')
+
     # Add labels and title
     ax.set_xlabel('X axis (mm)')
     ax.set_ylabel('Y axis (mm)')
@@ -301,7 +304,69 @@ def plot3Dreal(depth_image):
 
     # Show the plot
     plt.show()
+'''
+def plot3Dreal(depth_image):
+    depths_aoi = depth_image[area_of_interest[0][1]:area_of_interest[1][1], area_of_interest[0][0]:area_of_interest[1][0]]
+    heights_aoi = DEPTH_THRESHOLD_MAX - depths_aoi
+    
+    heights_aoi[heights_aoi < 0] = 0  # Set all negative values to 0
+    heights_aoi[heights_aoi >= DEPTH_THRESHOLD_MAX] = DEPTH_THRESHOLD_MIN  # Limit values that are too large
+    
+    heightmax = np.max(heights_aoi)
+    z_mean = np.mean(depths_aoi)
+    
+    # Generate the x and y coordinates
+    height, width = heights_aoi.shape
+    x_mean = (2 * np.tan(HFOV_RAD / 2) * z_mean) / SCREEN_WIDTH  # mm/pixel
+    y_mean = (2 * np.tan(VFOV_RAD / 2) * z_mean) / SCREEN_HEIGHT  # mm/pixel
 
+    # Generate x and y coordinates scaled to millimeters
+    x_coords = np.linspace(0, width - 1, width) * x_mean
+    y_coords = np.linspace(0, height - 1, height) * y_mean
+
+    # Create 2D coordinate matrices from 1D arrays
+    x_coords, y_coords = np.meshgrid(x_coords, y_coords)
+
+    # Flatten the coordinate matrices and height data for scatter plot
+    x_coords_flat = x_coords.flatten()
+    y_coords_flat = y_coords.flatten()
+    heights_flat = heights_aoi.flatten()
+
+    # Create a 3D plot
+    fig = plt.figure(figsize=(10, 7))
+    ax = fig.add_subplot(111, projection='3d')
+
+    # Plot the points using scatter
+    sc = ax.scatter(x_coords_flat, y_coords_flat, heights_flat, c=heights_flat, cmap='viridis')
+
+    # Add labels and title
+    ax.set_xlabel('X axis (mm)')
+    ax.set_ylabel('Y axis (mm)')
+    ax.set_zlabel('Height (mm)')
+    ax.set_title('3D Plot of Height Data')
+
+    # Add a color bar to show height values
+    fig.colorbar(sc, ax=ax, label='Height (mm)')
+
+    # Calculate ranges for each axis
+    x_range = x_coords.max() - x_coords.min()
+    y_range = y_coords.max() - y_coords.min()
+    z_range = heightmax - 0
+
+    # Calculate the maximum range
+    max_range = max(x_range, y_range, z_range)
+
+    # Set the limits for each axis based on the data
+    ax.set_xlim([x_coords.min(), x_coords.max()])
+    ax.set_ylim([y_coords.min(), y_coords.max()])
+    ax.set_zlim([0, heightmax])
+
+    # Adjust the aspect ratio
+    ax.set_box_aspect([x_range, y_range, z_range])  # Aspect ratio is [x, y, z]
+
+    # Show the plot
+    plt.show()
+'''
 
 def put_filter(depth_frame):
     # filtering
@@ -344,7 +409,7 @@ def tarre2(depth_image):
     
     volume = measure(depth_image)
     
-    if volume > 20000:
+    if volume > 10000:
         DEPTH_THRESHOLD_MAX = DEPTH_THRESHOLD_MAX - 1
     else:
         tarre2_execute_flag = False
