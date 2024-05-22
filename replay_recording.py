@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import os 
 import re
 
-DIRECTORY = "C:/Users/Johannes/Documents/Johannes/Schoolvakken/3de_bach/BACHELOR/proef/Documentatie/key tech metingen/14mei/witte_frieten/1500g"
+DIRECTORY = "C:/Users/Johannes/Documents/Johannes/Schoolvakken/3de_bach/BACHELOR/proef/Documentatie/key tech metingen/14mei/witte_frieten/500g"
 
 def load_frame(file_path):
     # Load the frame from a .npy file

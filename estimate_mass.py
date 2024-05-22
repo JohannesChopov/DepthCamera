@@ -111,7 +111,7 @@ def define_area_of_interest(small=True):
 
     return topleft_x, topleft_y, height, width
 
-RECT_TOPLEFTX, RECT_TOPLEFTY, RECT_HEIGHT, RECT_WIDTH = define_area_of_interest(True)
+RECT_TOPLEFTX, RECT_TOPLEFTY, RECT_HEIGHT, RECT_WIDTH = define_area_of_interest(False)
 area_of_interest = [(RECT_TOPLEFTX, RECT_TOPLEFTY), (RECT_TOPLEFTX + RECT_WIDTH, RECT_TOPLEFTY + RECT_HEIGHT)]
 
 integral1 = 0.0
@@ -548,8 +548,8 @@ def convert_depth(radial_depth, intrinsics):
     
     return perpendicular_depth
 
-def dynamic_area(x_mean,z_mean,z_new):
-    new_area = (z_new/z_mean * x_mean)**2
+def dynamic_area(x_mean, y_mean, z_mean, z_new):
+    new_area = (z_new/z_mean * x_mean)*(z_new/z_mean * y_mean)
     return new_area
 
 def dynamic_areas(depths):
@@ -557,8 +557,12 @@ def dynamic_areas(depths):
     
     z_mean = np.mean(depths)
     x_mean = (2 * math.tan(HFOV_RAD/ 2) * z_mean)/SCREEN_WIDTH # mm/pixel
+    y_mean = (2 * math.tan(VFOV_RAD/ 2) * z_mean)/SCREEN_HEIGHT # mm/pixel
     
-    new_areas = dynamic_area(x_mean, z_mean, depths)
+    #print(f" pixelX: {x_mean} mm/pixel")
+    #print(f" pixelY: {y_mean} mm/pixel")
+    
+    new_areas = dynamic_area(x_mean, y_mean, z_mean, depths)
     return new_areas
 
 def calculate_pixel_area(depth_frame):
@@ -899,7 +903,6 @@ while True:
     
     # Check for user input to start the measurements
     key = cv2.waitKey(1)
-    
     
     if key == ord('a'):
         get_flatness(depth_image)
