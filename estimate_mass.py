@@ -13,76 +13,81 @@ import math
 import matplotlib.pyplot as plt
 import os
 import sys
-from scipy.signal import convolve2d
-from scipy.ndimage import gaussian_filter
 from mpl_toolkits.mplot3d import Axes3D
 
-DIRECTORY = "C:/Users/Johannes/Documents/Johannes/Schoolvakken/3de_bach/BACHELOR/proef/Documentatie/thuis/15mei/gpt1"
+DIRECTORY = "C:/PATH/TO/STORE/DATA"
 
-# massa voor massa dichtheid calibratie
-mass = 507.5 #g
+# mass for bulkdensity calibration
+mass = 1000 #g
 
+# dried apricots
 density = 0.0012104976483512985 #g/mm³
-#density = 0.0005728 #g/mm³
-#density = 0.0002754 #g/mm³
-#density = 0.0004235 #g/mm³
+
+# red plastic cubes
+#density = 0.0008444570839365841 #g/mm³
+
+# white rubber fries
+#density = 0.0006681194862550151 #g/mm³
 
 SCREEN_WIDTH = 640 #pixels
 SCREEN_HEIGHT = 480 #pixels
 
-HFOV = 0
-VFOV = 0
+HFOV = 0 #°
+VFOV = 0 #°
 
 HFOV_RAD = 0 #rad
 VFOV_RAD = 0 #rad
 
 FPS = 60
 
-# seconden gebruiken als variabele!
-
 intrinsics = 0
 
 FOCAL_LENGTHX = 0
 FOCAL_LENGTHY = 0
 
-DEPTH_THRESHOLD_MIN = 0  # mm
-DEPTH_THRESHOLD_MAX = 750 # mm
-#DEPTH_THRESHOLD_MAX = 540 # mm
-
+# ranges for depth colormap
 #DEPTHRANGE = [720 , 735]
 DEPTHRANGE = [650 , 750]
+#DEPTHRANGE = [10 , 10000]
 #DEPTHRANGE = [450 , 550]
 
+# cutoff ranges
+DEPTH_THRESHOLD_MIN = 0  #mm
+DEPTH_THRESHOLD_MAX = DEPTHRANGE[1] #mm
+
+# range for height colormap
 HEIGHTRANGE = [0, 100]
-VARIATION = 1 #mm step for changing depth cut-off height
+
+# stepsize for changing depth cut-off value
+VARIATION = 1 #mm 
 
 ###############################################################
 
-start = 0
-tarrecounter = 0
+recording = 0
+'''tarrecounter = 0'''
 calibrate_counter = 0
 framecounter = 0
-# Distance from the camera in meters. Determined by the camera later...
-mean_distance = 0 # meters
+
+mean_distance = 0 #m
 
 def getFOV(profile):
     global HFOV, VFOV, HFOV_RAD, VFOV_RAD, FOCAL_LENGTHX, FOCAL_LENGTHY, SCREEN_WIDTH, SCREEN_HEIGHT, intrinsics
     
     # Get camera intrinsics
     intrinsics = profile.get_stream(rs.stream.depth).as_video_stream_profile().get_intrinsics()
-    FOCAL_LENGTHX = intrinsics.fx  # fx is de focale lengte in de x-richting
-    FOCAL_LENGTHY = intrinsics.fy  # fx is de focale lengte in de x-richting
+    FOCAL_LENGTHX = intrinsics.fx  # fx focal length in x
+    FOCAL_LENGTHY = intrinsics.fy  # fy focal length in y
     
-    # Pixelresolutie
+    # screens pixels
     SCREEN_WIDTH = intrinsics.width
     SCREEN_HEIGHT = intrinsics.height
     
-    # Horizontale en verticale FOV berekenen
-    HFOV_RAD = 2 * math.atan(SCREEN_WIDTH / (2 * FOCAL_LENGTHX)) #rad
-    VFOV_RAD = 2 * math.atan(SCREEN_HEIGHT / (2 * FOCAL_LENGTHY)) #rad
+    # Horizontal and vertical FOV
+    HFOV_RAD = 2 * math.atan(SCREEN_WIDTH / (2 * FOCAL_LENGTHX)) # rad
+    VFOV_RAD = 2 * math.atan(SCREEN_HEIGHT / (2 * FOCAL_LENGTHY)) # rad
     
-    HFOV = HFOV_RAD * (180 / math.pi) #graden
-    VFOV = VFOV_RAD * (180 / math.pi) #graden
+    HFOV = HFOV_RAD * (180 / math.pi) # °
+    VFOV = VFOV_RAD * (180 / math.pi) # °
     
     # Print camera intrinsics
     print("Focal Lengths: {}x{}".format(intrinsics.fx, intrinsics.fy))
@@ -97,7 +102,7 @@ def getFOV(profile):
     
 ######################################################################
 
-def define_area_of_interest(small=True):
+def define_area_of_interest(small):
     if small:
         topleft_x = 260  # pixels
         topleft_y = 150  # pixels
@@ -111,13 +116,9 @@ def define_area_of_interest(small=True):
 
     return topleft_x, topleft_y, height, width
 
-RECT_TOPLEFTX, RECT_TOPLEFTY, RECT_HEIGHT, RECT_WIDTH = define_area_of_interest(False)
+RECT_TOPLEFTX, RECT_TOPLEFTY, RECT_HEIGHT, RECT_WIDTH = define_area_of_interest(True)
 area_of_interest = [(RECT_TOPLEFTX, RECT_TOPLEFTY), (RECT_TOPLEFTX + RECT_WIDTH, RECT_TOPLEFTY + RECT_HEIGHT)]
 
-integral1 = 0.0
-volume1 = 0.0
-integral2 = 0.0
-volume2 = 0.0
 #######################################################################
 
 depthpoint = (0, 0)
@@ -187,8 +188,8 @@ def visualize_height(depth_image):
     
     height_image = DEPTH_THRESHOLD_MAX - (depth_image)
     
-    height_image[height_image < 0] = 0 # alle negatieve waarden worden 0
-    height_image[height_image >= DEPTH_THRESHOLD_MAX] = 0 # alle waarden die te groot zijn worden gelimit
+    height_image[height_image < 0] = 0 # all negative values become 0
+    height_image[height_image >= DEPTH_THRESHOLD_MAX] = 0 # values too great get limited
 
     #clipping
     height_image_scaled = (height_image - HEIGHTRANGE[0]) * (255 / (HEIGHTRANGE[1]-HEIGHTRANGE[0]))
@@ -199,11 +200,6 @@ def visualize_height(depth_image):
     
     # Draw the pre-defined rectangle on the height window
     cv2.rectangle(height_colormap, (area_of_interest[0][0], area_of_interest[0][1]), (area_of_interest[1][0], area_of_interest[1][1]), (0, 255, 0), 2)
-    '''
-    # Add text annotations
-    cv2.putText(height_colormap, "Width: {:.2f}m".format(REAL_RECT_WIDTH), (rectangle[0][0], rectangle[0][1] - 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1, cv2.LINE_AA)
-    cv2.putText(height_colormap, "Height: {:.2f}m".format(REAL_RECT_HEIGHT), (rectangle[1][0] + 10, rectangle[1][1]), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1, cv2.LINE_AA)
-    '''
     
     volume = measure(depth_image)
     
@@ -214,8 +210,6 @@ def visualize_height(depth_image):
     height_cursor = height_image[heightpoint[1], heightpoint[0]]
     cv2.putText(height_colormap, "Height: {:.0f}mm".format(height_cursor), (heightpoint[0] - 50, heightpoint[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 1)
     
-    #print("Height: {:.3f}m".format(height_cursor))
-    
     return height_colormap    
 
 def plot3Dpixels(depth_image):
@@ -223,189 +217,92 @@ def plot3Dpixels(depth_image):
     depths_aoi = depth_image[area_of_interest[0][1]:area_of_interest[1][1], area_of_interest[0][0]:area_of_interest[1][0]]
     heights_aoi = DEPTH_THRESHOLD_MAX - depths_aoi
     
-    heights_aoi[heights_aoi < 0] = 0 # alle negatieve waarden worden 0
-    heights_aoi[heights_aoi >= DEPTH_THRESHOLD_MAX] = DEPTH_THRESHOLD_MIN # alle waarden die te groot zijn worden gelimit
+    heights_aoi[heights_aoi < 0] = 0
+    heights_aoi[heights_aoi >= DEPTH_THRESHOLD_MAX] = DEPTH_THRESHOLD_MIN
     
-    # Generate the x and y coordinates
     height, width = heights_aoi.shape
     x = np.linspace(0, width - 1, width)
     y = np.linspace(0, height - 1, height)
     x, y = np.meshgrid(x, y)
 
-    # Create a 3D plot
     fig = plt.figure(figsize=(10, 7))
     ax = fig.add_subplot(111, projection='3d')
 
-    # Plot the surface
     ax.plot_surface(x, y, heights_aoi, cmap='viridis')
 
-    # Add labels and title
     ax.set_xlabel('X axis (pixels)')
     ax.set_ylabel('Y axis (pixels)')
     ax.set_zlabel('Height (mm)')
     ax.set_title('3D Plot of Height Data')
 
-    # Show the plot
     plt.show()
 
 def plot3Dreal(depth_image):
     depths_aoi = depth_image[area_of_interest[0][1]:area_of_interest[1][1], area_of_interest[0][0]:area_of_interest[1][0]]
     heights_aoi = DEPTH_THRESHOLD_MAX - depths_aoi
     
-    heights_aoi[heights_aoi < 0] = 0 # alle negatieve waarden worden 0
-    heights_aoi[heights_aoi >= DEPTH_THRESHOLD_MAX] = DEPTH_THRESHOLD_MIN # alle waarden die te groot zijn worden gelimit
-    
-    heightmax = np.max(heights_aoi)
-    z_mean = np.mean(depths_aoi)
-    z_max = np.max(depths_aoi)
-    
-    # Generate the x and y coordinates
-    height, width = heights_aoi.shape
-    
-    x_mean = (2 * np.tan(HFOV_RAD / 2) * z_mean) / SCREEN_WIDTH  # mm/pixel
-    x_coords = np.linspace(0, width - 1, width) * x_mean
-    
-    y_mean = (2 * np.tan(VFOV_RAD / 2) * z_mean) / SCREEN_HEIGHT  # mm/pixel
-    y_coords = np.linspace(0, height - 1, height) * y_mean  # assuming square pixels
-
-    x_coords, y_coords = np.meshgrid(x_coords, y_coords)
-
-    # Create a 3D plot
-    fig = plt.figure(figsize=(10, 7))
-    ax = fig.add_subplot(111, projection='3d')
-
-    # Plot the surface
-    ax.plot_surface(x_coords, y_coords, heights_aoi, cmap='viridis')
-
-    # Plot the points using scatter
-    #sc = ax.scatter(x_coords, y_coords, heights_aoi, c=heights_aoi, cmap='viridis')
-
-    # Add labels and title
-    ax.set_xlabel('X axis (mm)')
-    ax.set_ylabel('Y axis (mm)')
-    ax.set_zlabel('Height (mm)')
-    ax.set_title('3D Plot of Height Data')
-
-    # Calculate ranges for each axis
-    x_range = x_coords.max() - x_coords.min()
-    y_range = y_coords.max() - y_coords.min()
-    z_range = heightmax - 0
-
-    # Calculate the maximum range
-    max_range = max(x_range, y_range, z_range)
-
-    # Set the limits for each axis based on the data
-    ax.set_xlim([x_coords.min(), x_coords.max()])
-    ax.set_ylim([y_coords.min(), y_coords.max()])
-    ax.set_zlim([0, heightmax])
-
-    # Adjust the aspect ratio
-    ax.set_box_aspect([x_range, y_range, z_range])  # Aspect ratio is [x, y, z]
-
-    # Show the plot
-    plt.show()
-'''
-def plot3Dreal(depth_image):
-    depths_aoi = depth_image[area_of_interest[0][1]:area_of_interest[1][1], area_of_interest[0][0]:area_of_interest[1][0]]
-    heights_aoi = DEPTH_THRESHOLD_MAX - depths_aoi
-    
-    heights_aoi[heights_aoi < 0] = 0  # Set all negative values to 0
-    heights_aoi[heights_aoi >= DEPTH_THRESHOLD_MAX] = DEPTH_THRESHOLD_MIN  # Limit values that are too large
+    heights_aoi[heights_aoi < 0] = 0
+    heights_aoi[heights_aoi >= DEPTH_THRESHOLD_MAX] = DEPTH_THRESHOLD_MIN
     
     heightmax = np.max(heights_aoi)
     z_mean = np.mean(depths_aoi)
     
-    # Generate the x and y coordinates
     height, width = heights_aoi.shape
     x_mean = (2 * np.tan(HFOV_RAD / 2) * z_mean) / SCREEN_WIDTH  # mm/pixel
     y_mean = (2 * np.tan(VFOV_RAD / 2) * z_mean) / SCREEN_HEIGHT  # mm/pixel
 
-    # Generate x and y coordinates scaled to millimeters
     x_coords = np.linspace(0, width - 1, width) * x_mean
     y_coords = np.linspace(0, height - 1, height) * y_mean
 
-    # Create 2D coordinate matrices from 1D arrays
     x_coords, y_coords = np.meshgrid(x_coords, y_coords)
 
-    # Flatten the coordinate matrices and height data for scatter plot
     x_coords_flat = x_coords.flatten()
     y_coords_flat = y_coords.flatten()
     heights_flat = heights_aoi.flatten()
 
-    # Create a 3D plot
     fig = plt.figure(figsize=(10, 7))
     ax = fig.add_subplot(111, projection='3d')
 
-    # Plot the points using scatter
     sc = ax.scatter(x_coords_flat, y_coords_flat, heights_flat, c=heights_flat, cmap='viridis')
 
-    # Add labels and title
     ax.set_xlabel('X axis (mm)')
     ax.set_ylabel('Y axis (mm)')
     ax.set_zlabel('Height (mm)')
     ax.set_title('3D Plot of Height Data')
 
-    # Add a color bar to show height values
     fig.colorbar(sc, ax=ax, label='Height (mm)')
 
-    # Calculate ranges for each axis
     x_range = x_coords.max() - x_coords.min()
     y_range = y_coords.max() - y_coords.min()
     z_range = heightmax - 0
 
-    # Calculate the maximum range
     max_range = max(x_range, y_range, z_range)
 
-    # Set the limits for each axis based on the data
     ax.set_xlim([x_coords.min(), x_coords.max()])
     ax.set_ylim([y_coords.min(), y_coords.max()])
     ax.set_zlim([0, heightmax])
 
-    # Adjust the aspect ratio
-    ax.set_box_aspect([x_range, y_range, z_range])  # Aspect ratio is [x, y, z]
+    ax.set_box_aspect([x_range, y_range, z_range])
 
-    # Show the plot
     plt.show()
-'''
+
 
 def put_filter(depth_frame):
     # filtering
     depth_frame_filtered = apply_filters(depth_frame)
-    # naar numpy array
+    # to numpy array
     depth_array = np.asanyarray(depth_frame_filtered.get_data())
-    
-    #depth_array = gaussian_filter(depth_array, sigma=10)
     
     return depth_array
 
 # Global variables to store measurements
-background_measurements = []
 object_measurements = []
 volume_calibration = []
-mean_background = None
 
-def tarre(depth_image):
-    global mean_distance, integral1, volume1, background_measurements, DEPTH_THRESHOLD_MAX
-    
-    depths_aoi = depth_image[area_of_interest[0][1]:area_of_interest[1][1], area_of_interest[0][0]:area_of_interest[1][0]]
-    
-    mean_distance = np.mean(depths_aoi)
-    
-    if tarrecounter == 1:
-        DEPTH_THRESHOLD_MAX = mean_distance - 5
-    elif tarrecounter == 2:
-        DEPTH_THRESHOLD_MAX = 730
-    
-    '''
-    calculate_pixel_area(HFOV, VFOV, SCREEN_WIDTH, SCREEN_HEIGHT, mean_distance)
-    '''
-    print("MEAN DISTANCE = {:.2f}mm".format(mean_distance))
-    
 tarre2_execute_flag = False
-reset = False
 
 def tarre2(depth_image):
-    global tarre2_execute_flag, DEPTH_THRESHOLD_MAX, reset
+    global tarre2_execute_flag, DEPTH_THRESHOLD_MAX
     
     volume = measure(depth_image)
     
@@ -415,13 +312,13 @@ def tarre2(depth_image):
         tarre2_execute_flag = False
         
 def measure(depth_image_filtered):
-    global mean_distance, integral2, volume2, object_measurements, mean_background, recordcounter
+    global mean_distance, object_measurements, recordcounter
     
     depths_aoi = depth_image_filtered[area_of_interest[0][1]:area_of_interest[1][1], area_of_interest[0][0]:area_of_interest[1][0]]
     heights_aoi = DEPTH_THRESHOLD_MAX - depths_aoi
     
-    heights_aoi[heights_aoi < 0] = 0 # alle negatieve waarden worden 0
-    heights_aoi[heights_aoi >= DEPTH_THRESHOLD_MAX] = DEPTH_THRESHOLD_MIN # alle waarden die te groot zijn worden gelimit
+    heights_aoi[heights_aoi < 0] = 0
+    heights_aoi[heights_aoi >= DEPTH_THRESHOLD_MAX] = DEPTH_THRESHOLD_MIN
 
     voxels = dynamic_areas(depths_aoi) * heights_aoi
     object_volume = np.sum(voxels)
@@ -429,16 +326,12 @@ def measure(depth_image_filtered):
     #print("Volume object = {:.2f}mm³".format(object_volume)) # * density
     
     return object_volume
-    '''
-    object_measurements.append(object_volume * density) # *0.269570194 * density)
-    
-    '''
 
 def calc_density(mass, depth_image):
     
     volume = measure(depth_image)
     
-    #gebruik een lijst voor average te vinden en dan zo de density van de voeding.
+    #  list to get average --> bulkdensity
     volume_calibration.append(volume)
     
     density = mass/volume
@@ -473,41 +366,6 @@ def get_density(depth_image, mass):
         volume_calibration = [] #reset
         calibrate_counter = 0
 
-def tarre_live(depth_image):
-    global background_measurements, tarrecounter, mean_background
-    if tarrecounter == 1:
-        tarre(depth_image)
-    if tarrecounter == 2:
-        # Calculate the average volume of raw data
-        average_volume_raw = np.mean(background_measurements)
-        print(f"Average Raw Background Volume: {average_volume_raw}")
-
-        # Apply the moving average filter to the measurement data
-        window_size = 5  # Example window size; you may choose to change this
-        smoothed_measurements = moving_average(background_measurements, window_size)
-
-        # Calculate the average volume of smoothed data
-        average_volume_smoothed = np.mean(smoothed_measurements)
-        print(f"Average Smoothed Background Volume: {average_volume_smoothed}")
-        
-        mean_background = average_volume_raw
-        
-        
-        # Plot the results
-        plt.figure(figsize=(10, 6))
-        plt.plot(background_measurements, label='Raw Volume Measurements', alpha=0.5)
-        plt.plot(range(window_size - 1, len(smoothed_measurements) + window_size - 1), smoothed_measurements, label='Smoothed Volume Measurements', color='orange')
-        plt.axhline(y=average_volume_raw, color='r', linestyle='-', label='Average Raw Volume')
-        plt.axhline(y=average_volume_smoothed, color='green', linestyle='--', label='Average Smoothed Volume')
-        plt.xlabel('Measurement Number')
-        plt.ylabel('Volume in mm')
-        plt.title('Background Volume Measurements')
-        plt.legend()
-        plt.show()
-        
-        background_measurements = []
-        tarrecounter = 0
-
 def get_flatness(depths):
     depths_aoi = depths[area_of_interest[0][1]:area_of_interest[1][1], area_of_interest[0][0]:area_of_interest[1][0]]
     
@@ -530,24 +388,6 @@ def get_flatness(depths):
     
     return flatness
 
-def convert_depth(radial_depth, intrinsics):
-    focal_length = intrinsics.fx
-    width = intrinsics.width
-    height = intrinsics.height
-    
-    # Create meshgrid of pixel coordinates
-    x = np.linspace(-width // 2, width // 2, width)
-    y = np.linspace(-height // 2, height // 2, height)
-    X, Y = np.meshgrid(x, y)
-
-    # Calculate theta for each pixel
-    theta = np.arctan2(np.sqrt(X**2 + Y**2), focal_length)
-    
-    # Convert radial depth to perpendicular depth
-    perpendicular_depth = radial_depth * np.cos(theta)
-    
-    return perpendicular_depth
-
 def dynamic_area(x_mean, y_mean, z_mean, z_new):
     new_area = (z_new/z_mean * x_mean)*(z_new/z_mean * y_mean)
     return new_area
@@ -564,61 +404,7 @@ def dynamic_areas(depths):
     
     new_areas = dynamic_area(x_mean, y_mean, z_mean, depths)
     return new_areas
-
-def calculate_pixel_area(depth_frame):
-    global intrinsics
-    fx = intrinsics.fx 
-    fy = intrinsics.fy
-    cx = intrinsics.ppx
-    cy = intrinsics.ppy
-    height, width = depth_frame.shape
-    areas = np.zeros((height, width))
-    
-    for v in range(height - 1):
-        for u in range(width - 1):
-            Z = depth_frame[v, u]
-            Z_right = depth_frame[v, u + 1]
-            Z_bottom = depth_frame[v + 1, u]
-            
-            X = (u - cx) * Z / fx
-            Y = (v - cy) * Z / fy
-            
-            X_right = ((u + 1) - cx) * Z_right / fx
-            Y_bottom = ((v + 1) - cy) * Z_bottom / fy
-            
-            deltaX = abs(X_right - X)
-            deltaY = abs(Y_bottom - Y)
-            
-            areas[v, u] = deltaX * deltaY
-            
-    return areas
-
-def calculate_pixel_area_fov(depth_frame):
-    height, width = depth_frame.shape
-    
-    fov_x = HFOV_RAD
-    fov_y = VFOV_RAD
-    
-    # Calculate the angular resolution per pixel
-    pixel_angle_x = fov_x / width
-    pixel_angle_y = fov_y / height
-    
-    # Initialize the area array
-    areas = np.zeros((height, width))
-    
-    for v in range(height):
-        for u in range(width):
-            Z = depth_frame[v, u]
-            
-            # Calculate delta X and delta Y
-            deltaX = 2 * Z * np.tan(pixel_angle_x / 2)
-            deltaY = 2 * Z * np.tan(pixel_angle_y / 2)
-            
-            # Calculate the area for the pixel
-            areas[v, u] = deltaX * deltaY
-            
-    return areas
-
+'''
 def calculatePixelAreas(depths):
     #depth in mm
     global HFOV_RAD, VFOV_RAD
@@ -642,8 +428,8 @@ def calc(depths):
     avg_pixel_ver = (2 * math.tan(VFOV_RAD/ 2) * mean_distance)/SCREEN_HEIGHT # mm/pixel
     
     avg_pixel_area = avg_pixel_hor * avg_pixel_ver
-    '''print(avg_pixel_hor)
-    print(avg_pixel_ver)'''
+    print(avg_pixel_area)
+    
     return avg_pixel_area
 
 def getPixelArea(depth):
@@ -668,7 +454,7 @@ def getPixelAreaMean(depth):
     
     pixel_area = x_mean * x_mean #mm²
     return pixel_area
-
+'''
 # Create a pipeline
 pipe = rs.pipeline()
 
@@ -677,22 +463,19 @@ cfg = rs.config()
 cfg.enable_stream(rs.stream.color, SCREEN_WIDTH, SCREEN_HEIGHT, rs.format.bgr8, FPS)
 cfg.enable_stream(rs.stream.depth, SCREEN_WIDTH, SCREEN_HEIGHT, rs.format.z16, FPS)
 
-# Create mouse event for depth
 cv2.namedWindow("Depth Colormap with Legend")
 cv2.setMouseCallback("Depth Colormap with Legend", show_depth)
 
-# Create mouse event for height
 cv2.namedWindow("Height Colormap with Legend")
 cv2.setMouseCallback("Height Colormap with Legend", show_height)
-
 
 # Start the pipeline
 profile = pipe.start(cfg)
 getFOV(profile)
 
 device = profile.get_device()
-# Access the depth sensor
 depth_sensor = device.first_depth_sensor()
+
 if depth_sensor:
     # Get depth scale (units) - how many meters each depth unit corresponds to
     depth_scale = depth_sensor.get_depth_scale()
@@ -706,77 +489,8 @@ def moving_average(data, window_size):
     ma_vec = (cumsum_vec[window_size:] - cumsum_vec[:-window_size]) / window_size
     return ma_vec
 
-def perform_tarre():
-    global background_measurements, mean_background
-    background_measurements = []
-    
-    for _ in range(200):  # Replace with 1000 for your actual use
-        frame = pipe.wait_for_frames()
-        depth_frame = frame.get_depth_frame()
-        tarre(depth_frame)  # Fetch and use a new depth_frame for each measurement
-    
-    # Calculate the average volume of raw data
-    average_volume_raw = np.mean(background_measurements)
-    print(f"Average Raw Background Volume: {average_volume_raw}")
-
-    # Apply the moving average filter to the measurement data
-    window_size = 5  # Example window size; you may choose to change this
-    smoothed_measurements = moving_average(background_measurements, window_size)
-
-    # Calculate the average volume of smoothed data
-    average_volume_smoothed = np.mean(smoothed_measurements)
-    print(f"Average Smoothed Background Volume: {average_volume_smoothed}")
-    
-    mean_background = average_volume_raw
-    
-    # Plot the results
-    plt.figure(figsize=(10, 6))
-    plt.plot(background_measurements, label='Raw Volume Measurements', alpha=0.5)
-    plt.plot(range(window_size - 1, len(smoothed_measurements) + window_size - 1), smoothed_measurements, label='Smoothed Volume Measurements', color='orange')
-    plt.axhline(y=average_volume_raw, color='r', linestyle='-', label='Average Raw Volume')
-    plt.axhline(y=average_volume_smoothed, color='green', linestyle='--', label='Average Smoothed Volume')
-    plt.xlabel('Measurement Number')
-    plt.ylabel('Volume in mm')
-    plt.title('Background Volume Measurements')
-    plt.legend()
-    plt.show()
-        
-def perform_measurements():
-    """Perform measurements and calculate the average."""
-    global object_measurements
-    object_measurements = []  # Reset previous measurements
-    
-    for _ in range(1000):  # Replace with 1000 for your actual use
-        frame = pipe.wait_for_frames()
-        depth_frame = frame.get_depth_frame()
-        measure(depth_frame)  # Fetch and use a new depth_frame for each measurement
-    
-    # Calculate the average volume of raw data
-    average_volume_raw = np.mean(object_measurements)
-    print(f"Average Raw Volume: {average_volume_raw}")
-
-    # Apply the moving average filter to the measurement data
-    window_size = 5  # Example window size; you may choose to change this
-    smoothed_measurements = moving_average(object_measurements, window_size)
-
-    # Calculate the average volume of smoothed data
-    average_volume_smoothed = np.mean(smoothed_measurements)
-    print(f"Average Smoothed Volume: {average_volume_smoothed}")
-    
-    # Plot the results
-    plt.figure(figsize=(10, 6))
-    plt.plot(object_measurements, label='Raw Volume Measurements', alpha=0.5)
-    plt.plot(range(window_size - 1, len(smoothed_measurements) + window_size - 1), smoothed_measurements, label='Smoothed Volume Measurements', color='orange')
-    plt.axhline(y=average_volume_raw, color='r', linestyle='-', label='Average Raw Volume')
-    plt.axhline(y=average_volume_smoothed, color='green', linestyle='--', label='Average Smoothed Volume')
-    plt.xlabel('Measurement Number')
-    plt.ylabel('Volume in mm³')
-    plt.title('Object Volume Measurements')
-    plt.legend()
-    plt.show()
-
 def outputToCSV(depth_frame, color_frame, save_directory=DIRECTORY):
-    global start, object_measurements, framecounter
+    global recording, object_measurements, framecounter
     
     # Ensure the save directory exists
     if not os.path.exists(save_directory):
@@ -784,17 +498,17 @@ def outputToCSV(depth_frame, color_frame, save_directory=DIRECTORY):
     # Define file path
     file_path = os.path.join(save_directory, "output.csv")
     
-    if start == 1:
+    if recording == 1:
         object_volume = measure(depth_frame)
         object_measurements.append(object_volume * density)
         framecounter += 1
         save_depth_frame(depth_frame, framecounter)
         save_height_frame(depth_frame, framecounter)
         save_color_frame(color_frame, framecounter)
-    if start == 2:
+    if recording == 2:
         np.savetxt(file_path, object_measurements, delimiter=",", fmt='%d')
         object_measurements = []
-        start = 0
+        recording = 0
 
 def save_depth_frame(depth_frame, frame_index, save_directory=DIRECTORY):
     
@@ -865,7 +579,6 @@ def create_legend(height, width, ranges):
     font_color = (0, 255, 0)  # Green color
     font_type = cv2.FONT_HERSHEY_SIMPLEX
     
-    
     legend = cv2.copyMakeBorder(gradient, 0, 0, pad_left, pad_right, cv2.BORDER_CONSTANT, value=[0, 0, 0])
     
     for i in range(intervals + 1):
@@ -875,7 +588,7 @@ def create_legend(height, width, ranges):
     
     return legend
 
-# Continuous loop
+# Continuous loop: working camera
 while True:
     frame = pipe.wait_for_frames()
 
@@ -901,7 +614,7 @@ while True:
     combined_image_height = np.hstack((height_colormap, legend_height))
     cv2.imshow('Height Colormap with Legend', combined_image_height)
     
-    # Check for user input to start the measurements
+    # Check for user input to calibrate and start the measurements
     key = cv2.waitKey(1)
     
     if key == ord('a'):
@@ -913,13 +626,10 @@ while True:
     elif key == ord('g'):
         DEPTH_THRESHOLD_MAX = max(DEPTH_THRESHOLD_MIN, DEPTH_THRESHOLD_MAX - VARIATION)  # Ensure max_depth does not go below min_depth
     
-    # automatic cutoff
+    # automatic cutoff (recommended)
     elif key == ord('o'): #start tarre
-        
         tarre2_execute_flag = True
     
-        #tarrecounter = 1
-        #tarre(depth_image)
     elif key == ord('l'): #reset tarre
     
         DEPTH_THRESHOLD_MAX = DEPTHRANGE[1]
@@ -933,12 +643,12 @@ while True:
     
     # start recording
     elif key == ord('p'): #start measuring and append to the list
-        start = 1
+        recording = 1
         framecounter = 0
     elif key == ord('m'): #stop measurements and output into csv file.
-        start = 2
+        recording = 2
         
-    if key == ord('v'):
+    if key == ord('v'): #make a 3d plot of the area of interest
         plot3Dpixels(depth_image)
         plot3Dreal(depth_image)
         
